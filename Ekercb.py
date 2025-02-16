@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # WordPress weboldal URL-je (a "/wp-json/wp/v2/posts" végpont a cikkek lekérdezéséhez)
-WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=500""
+WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=500"
 
 # WordPress API-ból cikkek lekérése
 def get_wordpress_articles():
