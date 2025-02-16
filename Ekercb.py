@@ -28,26 +28,37 @@ def get_wordpress_articles():
 # Rugalmas keresési logika
 def search_articles(user_query, articles):
     results = []
-    query_words = user_query.lower().split()  # A kérdést szavakra bontjuk
-    
+    query_lower = user_query.lower()
+
     for article in articles:
         title = clean_html(article.get("title", {}).get("rendered", ""))
         content = clean_html(article.get("content", {}).get("rendered", ""))
         link = article.get("link", "")
 
-        # Szórészleges keresés
-        match_score = sum(1 for word in query_words if word in title.lower() or word in content.lower())
+        score = 0  # Kezdő pontszám
 
-        if match_score > 0:
-            results.append((match_score, f"📌 **[{title}]({link})**\n\n{content[:300]}..."))
+        # **Legfontosabb: ha a teljes keresett kifejezés szerepel a címben, akkor kiemelt prioritás**
+        if query_lower in title.lower():
+            score += 5  # Nagyon magas prioritás
 
-    # A legrelevánsabb cikkek legyenek elöl
+        # **Ha a keresett szó a címben szerepel, de nem pontos egyezéssel**
+        elif any(word in title.lower() for word in query_lower.split()):
+            score += 3  
+
+        # **Ha csak a cikk tartalmában fordul elő, de nem a címben, akkor kisebb pontszám**
+        elif query_lower in content.lower():
+            score += 1  
+
+        # Ha van relevancia, hozzáadjuk az eredményekhez
+        if score > 0:
+            results.append((score, f"📌 **[{title}]({link})**\n\n{content[:300]}..."))
+
+    # **Csak a legjobb 5 találatot jelenítsük meg**
     results.sort(reverse=True, key=lambda x: x[0])
+    results = results[:5]
 
-    if not results:
-        return ["❌ Nincs találat. Az első 5 cikk az adatbázisból:\n\n" + "\n".join(f"- {clean_html(a.get('title', {}).get('rendered', ''))}" for a in articles[:5])]
+    return [res[1] for res in results] if results else ["❌ Nincs találat a keresett témában."]
 
-    return [res[1] for res in results]
 
 # Streamlit alkalmazás
 st.title("📖 WordPress Chatbot")
