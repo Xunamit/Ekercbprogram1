@@ -1,3 +1,9 @@
 beautifulsoup4
 flask
+fastapi
+starlette
+uvicorn
+beautifulsoup4
+requests
+
 
