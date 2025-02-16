@@ -1,31 +1,34 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
-import difflib  # Rugalmas kereséshez
 
-# WordPress API URL (több cikk lekérése)
-WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=50"
+# WordPress API alap URL
+BASE_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts"
 
 # HTML eltávolítása
 def clean_html(text):
     return BeautifulSoup(text, "html.parser").get_text()
 
-# WordPress API lekérése
-def get_wordpress_articles():
-    try:
-        response = requests.get(WORDPRESS_API_URL)
+# Több cikk lekérése lapozással
+def get_all_articles(max_pages=5, per_page=50):
+    articles = []
+    for page in range(1, max_pages + 1):
+        api_url = f"{BASE_API_URL}?per_page={per_page}&page={page}"
+        response = requests.get(api_url)
+        
         if response.status_code == 200:
-            articles = response.json()
-            st.write(f"🔎 {len(articles)} cikk lett letöltve az API-ból.")  # Ellenőrzéshez
-            return articles
+            new_articles = response.json()
+            if not new_articles:
+                break  # Ha nincs több cikk, leállunk
+            articles.extend(new_articles)
         else:
             st.error(f"⚠️ Hiba az API lekérdezésénél: {response.status_code}")
-            return []
-    except Exception as e:
-        st.error(f"⚠️ Hiba történt: {e}")
-        return []
+            break  # Ha hiba van, ne próbálkozzon tovább
+        
+    st.write(f"🔎 Összesen {len(articles)} cikk lett letöltve az API-ból.")  
+    return articles
 
-# Rugalmas keresési logika
+# Keresési logika - teljes kifejezés előnyben!
 def search_articles(user_query, articles):
     results = []
     query_lower = user_query.lower()
@@ -35,30 +38,27 @@ def search_articles(user_query, articles):
         content = clean_html(article.get("content", {}).get("rendered", ""))
         link = article.get("link", "")
 
-        score = 0  # Kezdő pontszám
+        score = 0
 
-        # **Legfontosabb: ha a teljes keresett kifejezés szerepel a címben, akkor kiemelt prioritás**
+        # **Teljes kifejezés előnyben**
         if query_lower in title.lower():
-            score += 5  # Nagyon magas prioritás
-
-        # **Ha a keresett szó a címben szerepel, de nem pontos egyezéssel**
-        elif any(word in title.lower() for word in query_lower.split()):
-            score += 3  
-
-        # **Ha csak a cikk tartalmában fordul elő, de nem a címben, akkor kisebb pontszám**
+            score += 5  # Ha a teljes keresett kifejezés a címben szerepel, az kiemelt prioritású
         elif query_lower in content.lower():
+            score += 3  # Ha a teljes kifejezés a tartalomban szerepel, az közepes prioritású
+        
+        # **Ha egyes szavak külön szerepelnek, kisebb pontszám**
+        elif any(word in title.lower() for word in query_lower.split()):
+            score += 2  
+        elif any(word in content.lower() for word in query_lower.split()):
             score += 1  
 
-        # Ha van relevancia, hozzáadjuk az eredményekhez
         if score > 0:
             results.append((score, f"📌 **[{title}]({link})**\n\n{content[:300]}..."))
 
-    # **Csak a legjobb 5 találatot jelenítsük meg**
     results.sort(reverse=True, key=lambda x: x[0])
-    results = results[:5]
+    results = results[:5]  # Max. 5 releváns találat
 
     return [res[1] for res in results] if results else ["❌ Nincs találat a keresett témában."]
-
 
 # Streamlit alkalmazás
 st.title("📖 WordPress Chatbot")
@@ -67,7 +67,8 @@ st.write("Kérdezz a weboldal tartalma alapján!")
 user_input = st.text_input("Írd be a kérdésed...")
 
 if user_input:
-    articles = get_wordpress_articles()
+    articles = get_all_articles(max_pages=5, per_page=50)  # 5x50 = max. 250 cikket keres át
     search_results = search_articles(user_input, articles)
     for result in search_results:
         st.write(result)
+
