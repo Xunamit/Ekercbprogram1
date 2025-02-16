@@ -1,6 +1,11 @@
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
+import json
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 # WordPress API alap URL
 BASE_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts"
@@ -19,19 +24,18 @@ def get_all_articles(max_pages=5, per_page=50):
         if response.status_code == 200:
             new_articles = response.json()
             if not new_articles:
-                break  # Ha nincs több cikk, leállunk
+                break
             articles.extend(new_articles)
         else:
-            st.error(f"⚠️ Hiba az API lekérdezésénél: {response.status_code}")
-            break  # Ha hiba van, ne próbálkozzon tovább
-        
-    st.write(f"🔎 Összesen {len(articles)} cikk lett letöltve az API-ból.")  
+            return []
     return articles
 
-# Keresési logika - teljes kifejezés előnyben!
-def search_articles(user_query, articles):
+# Keresési funkció API számára
+@app.route("/chatbot", methods=["GET"])
+def chatbot_api():
+    user_query = request.args.get("q", "").lower()
+    articles = get_all_articles()
     results = []
-    query_lower = user_query.lower()
 
     for article in articles:
         title = clean_html(article.get("title", {}).get("rendered", ""))
@@ -39,36 +43,20 @@ def search_articles(user_query, articles):
         link = article.get("link", "")
 
         score = 0
-
-        # **Teljes kifejezés előnyben**
-        if query_lower in title.lower():
-            score += 5  # Ha a teljes keresett kifejezés a címben szerepel, az kiemelt prioritású
-        elif query_lower in content.lower():
-            score += 3  # Ha a teljes kifejezés a tartalomban szerepel, az közepes prioritású
+        if user_query in title.lower():
+            score += 5
+        elif user_query in content.lower():
+            score += 3
         
-        # **Ha egyes szavak külön szerepelnek, kisebb pontszám**
-        elif any(word in title.lower() for word in query_lower.split()):
-            score += 2  
-        elif any(word in content.lower() for word in query_lower.split()):
-            score += 1  
-
         if score > 0:
-            results.append((score, f"📌 **[{title}]({link})**\n\n{content[:300]}..."))
+            results.append({"title": title, "link": link, "excerpt": content[:300]})
 
-    results.sort(reverse=True, key=lambda x: x[0])
-    results = results[:5]  # Max. 5 releváns találat
+    if not results:
+        return jsonify({"message": "Nincs találat"}), 404
 
-    return [res[1] for res in results] if results else ["❌ Nincs találat a keresett témában."]
+    return jsonify(results)
 
-# Streamlit alkalmazás
-st.title("📖 WordPress Chatbot")
-st.write("Kérdezz a weboldal tartalma alapján!")
+if __name__ == "__main__":
+    app.run(debug=True)
 
-user_input = st.text_input("Írd be a kérdésed...")
-
-if user_input:
-    articles = get_all_articles(max_pages=5, per_page=50)  # 5x50 = max. 250 cikket keres át
-    search_results = search_articles(user_input, articles)
-    for result in search_results:
-        st.write(result)
-
+        
