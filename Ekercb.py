@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 import difflib  # Rugalmas kereséshez
 
 # WordPress API URL (több cikk lekérése)
-WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=150"
+WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=50"
 
 # HTML eltávolítása
 def clean_html(text):
