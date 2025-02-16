@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # WordPress weboldal URL-je (a "/wp-json/wp/v2/posts" végpont a cikkek lekérdezéséhez)
-WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts"
+WORDPRESS_API_URL = "https://www.egyenisegepites.hu/wp-json/wp/v2/posts?per_page=500""
 
 # WordPress API-ból cikkek lekérése
 def get_wordpress_articles():
@@ -24,20 +24,21 @@ def search_articles(user_query, articles):
     for article in articles:
         title = clean_html(article.get("title", {}).get("rendered", ""))
         content = clean_html(article.get("content", {}).get("rendered", ""))
-        
+        link = article.get("link", "")  # Cikk linkje
+
         # Pontozás: ha a keresett szó a címben van, nagyobb súlyt kap
         score = 0
         if user_query.lower() in title.lower():
             score += 2
         if user_query.lower() in content.lower():
             score += 1
-        
+
         if score > 0:
-            results.append((score, f"**{title}**\n\n{content[:300]}..."))  # Az első 300 karakter jelenik meg
+            results.append((score, f"📌 **[{title}]({link})**\n\n{content[:300]}..."))  # Link és kivonat megjelenítése
 
     # A legrelevánsabb cikkek jelenjenek meg először
     results.sort(reverse=True, key=lambda x: x[0])
-    
+
     return [res[1] for res in results] if results else ["Nincs találat a kérdésedre."]
 
 # Streamlit felület
